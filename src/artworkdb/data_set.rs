@@ -8,26 +8,20 @@
 
 use binrw::binrw;
 
-use super::{album::AlbumItem, playlist::Playlist, track::TrackItem};
+use super::image::ImageItem;
 
 #[binrw]
 #[br(import { id: u32 })]
 #[derive(Debug)]
 pub enum SetType {
     #[br(pre_assert(id == 0x01))] // ← pick this variant when id == 1
-    Tracks(TrackList),
+    Images(ImageList),
 
     #[br(pre_assert(id == 0x02))]
-    Playlists(PlaylistList),
-
-    #[br(pre_assert(id == 0x03))]
-    Podcasts(PlaylistList),
-
-    #[br(pre_assert(id == 0x04))]
     Albums(AlbumList),
 
-    #[br(pre_assert(id == 0x05))]
-    InclSmartPlaylists(PlaylistList),
+    #[br(pre_assert(id == 0x03))]
+    Files(FileList),
 }
 
 #[binrw]
@@ -48,19 +42,17 @@ pub(crate) struct DataSet {
 impl SetType {
     pub fn as_id(&self) -> u32 {
         match self {
-            SetType::Tracks(_) => 0x01,
-            SetType::Playlists(_) => 0x02,
-            SetType::Podcasts(_) => 0x03,
-            SetType::Albums(_) => 0x04,
-            SetType::InclSmartPlaylists(_) => 0x05,
+            SetType::Images(_) => 0x01,
+            SetType::Albums(_) => 0x02,
+            SetType::Files(_) => 0x03,
         }
     }
 }
 
 #[binrw]
-#[brw(little, magic = b"mhlt")]
+#[brw(little, magic = b"mhli")]
 #[derive(Debug)]
-pub(crate) struct TrackList {
+pub(crate) struct ImageList {
     pub header_len: u32,
 
     #[bw(calc = entries.len() as u32)]
@@ -68,7 +60,7 @@ pub(crate) struct TrackList {
 
     #[brw(pad_before = 80)]
     #[br(count = entry_count)]
-    pub entries: Vec<TrackItem>,
+    pub entries: Vec<ImageItem>,
 }
 
 #[binrw]
@@ -82,13 +74,13 @@ pub(crate) struct AlbumList {
 
     #[brw(pad_before = 80)]
     #[br(count = entry_count)]
-    pub entries: Vec<AlbumItem>,
+    pub entries: Vec<u8>,
 }
 
 #[binrw]
 #[brw(little, magic = b"mhlp")]
 #[derive(Debug)]
-pub(crate) struct PlaylistList {
+pub(crate) struct FileList {
     pub header_len: u32,
 
     #[bw(calc = entries.len() as u32)]
@@ -96,5 +88,5 @@ pub(crate) struct PlaylistList {
 
     #[brw(pad_before = 80)]
     #[br(count = entry_count)]
-    pub entries: Vec<Playlist>,
+    pub entries: Vec<u8>,
 }
