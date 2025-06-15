@@ -1,0 +1,14 @@
+[package]
+name = "rpodlib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.98"
+binrw = "0.15.0"
+bytemuck = "1.23.1"
+chrono = "0.4.41"
+hex = "0.4.3"
+hmac = "0.12.1"
+rand = "0.9.1"
+sha1 = "0.10.6"
