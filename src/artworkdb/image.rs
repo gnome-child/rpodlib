@@ -42,3 +42,52 @@ pub(crate) struct ImageItem {
     pub data_objects: Vec<DataObject>,
 }
 
+#[binrw]
+#[brw(little, magic = b"mhni")]
+#[derive(Debug)]
+pub(crate) struct ImageInfo {
+    pub header_len: u32,
+    pub len: u32,
+
+    #[bw(calc = data_objects.len() as u32)]
+    pub child_count: u32,
+
+    pub corr_id: u32,
+    pub ithmb_offset: u32,
+    pub image_size: u32,
+    pub v_pad: i16,
+    pub h_pad: i16,
+    pub img_height: u16,
+    pub img_width: u16,
+    unk_0x24: u32,
+
+    #[bw(calc = self.image_size)]
+    pub image_size_dup: u32,
+
+    #[brw(pad_before = 32)]
+    #[br(count = child_count)]
+    pub data_objects: Vec<DataObject>,
+}
+
+#[binrw]
+#[brw(little, magic = b"mhif")]
+#[derive(Debug)]
+pub(crate) struct ImageFile {
+    pub header_len: u32,
+    pub len: u32,
+    unk_0x0C: u32,
+    pub correlation_id: u32,
+
+    #[brw(pad_after = 100)]
+    pub image_size: u32,
+}
+
+#[binrw]
+#[brw(little, magic = b"mhaf")]
+#[derive(Debug)]
+pub(crate) struct MhafItem {
+    pub len: u32,
+
+    #[brw(pad_after = 84)]
+    unk_0x04: u32, // always 0x3C?? (60)
+}

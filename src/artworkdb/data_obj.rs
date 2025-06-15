@@ -9,7 +9,7 @@
 use binrw::binrw;
 use bytemuck::try_cast_slice;
 
-use super::image_meta::ImageInfo;
+use super::image::{ImageInfo, MhafItem};
 
 #[binrw]
 #[br(import { id: u32, bytes_left: u32 })]
@@ -20,7 +20,7 @@ pub(crate) enum ObjectType {
     #[br(pre_assert(id ==  3))]
     IthmbFileName(#[br(args { bytes_left })] Utf16IthmbName),
     #[br(pre_assert(id ==  6))]
-    MhafHolder(#[br(args { bytes_left })] Unimplemented),
+    MhafHolder(#[br(args { bytes_left })] MhafObj),
 }
 impl ObjectType {
     pub fn as_id(&self) -> u32 {
@@ -73,7 +73,7 @@ pub(crate) struct Utf16IthmbName {
 
 impl Utf16IthmbName {
     pub fn to_string(&self) -> Result<String, std::string::FromUtf16Error> {
-        assert!(self.string_data.len() % 2 == 0, "Malformed utf16!");
+        assert!(self.string_data.len() % 2 == 0, "Malformed UTF-16");
 
         let words: &[u16] =
             try_cast_slice(&self.string_data).expect("Failed to cast byte array to u16 array");
@@ -85,8 +85,16 @@ impl Utf16IthmbName {
 #[binrw]
 #[br(import { bytes_left: u32 = 0 })]
 #[derive(Debug)]
+pub(crate) struct MhafObj {
+    unk_0x00: u32,
+    unk_0x04: u32,
+    pub mhaf: MhafItem,
+}
+
+#[binrw]
+#[br(import { bytes_left: u32 = 0 })]
+#[derive(Debug)]
 pub(crate) struct Unimplemented {
     #[br(count = bytes_left)]
     data: Vec<u8>,
 }
-

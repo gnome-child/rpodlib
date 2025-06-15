@@ -206,7 +206,7 @@ pub(crate) struct Utf16StringObj {
 
 impl Utf16StringObj {
     pub fn to_string(&self) -> Result<String, std::string::FromUtf16Error> {
-        assert!(self.string_data.len() % 2 == 0, "Malformed utf16!");
+        assert!(self.string_data.len() % 2 == 0, "Malformed UTF-16");
 
         let words: &[u16] =
             try_cast_slice(&self.string_data).expect("Failed to cast byte array to u16 array");
@@ -239,4 +239,3 @@ pub(crate) struct Unimplemented {
     #[br(count = bytes_left)]
     data: Vec<u8>,
 }
-

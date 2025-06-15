@@ -8,7 +8,6 @@
 pub(crate) mod data_obj;
 pub(crate) mod data_set;
 pub(crate) mod image;
-pub(crate) mod image_meta;
 pub(crate) mod master;
 
 #[cfg(test)]
@@ -26,4 +25,3 @@ mod tests {
         let master: Master = Master::read(&mut cursor).expect("failed");
     }
 }
-

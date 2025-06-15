@@ -78,7 +78,7 @@ pub(crate) struct AlbumList {
 }
 
 #[binrw]
-#[brw(little, magic = b"mhlp")]
+#[brw(little, magic = b"mhlf")]
 #[derive(Debug)]
 pub(crate) struct FileList {
     pub header_len: u32,
