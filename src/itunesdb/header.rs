@@ -1,3 +1,8 @@
+//! rpodlib – iTunesDB parser & writer
+//!
+//! SPDX-License-Identifier: GPL-3.0-or-later
+//! Copyright © 2025 gnome-child
+
 #![allow(non_snake_case)]
 #![allow(unused)]
 
@@ -318,3 +323,4 @@ pub(crate) struct DataObject {
     #[br(pad_before = len - 12)]
     _skipped_bytes: (),
 }
+

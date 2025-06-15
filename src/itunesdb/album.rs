@@ -1,3 +1,8 @@
+//! rpodlib – iTunesDB parser & writer
+//!
+//! SPDX-License-Identifier: GPL-3.0-or-later
+//! Copyright © 2025 gnome-child
+
 #![allow(non_snake_case)]
 #![allow(unused)]
 
@@ -24,3 +29,4 @@ pub(crate) struct AlbumItem {
     #[br(count = data_obj_count)]
     data_objects: Vec<DataObject>,
 }
+

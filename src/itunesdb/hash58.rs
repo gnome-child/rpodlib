@@ -1,3 +1,8 @@
+//! rpodlib – iTunesDB parser & writer
+//!
+//! SPDX-License-Identifier: GPL-3.0-or-later
+//! Copyright © 2025 gnome-child
+
 #![allow(unused)]
 
 use sha1::{Digest, Sha1};
@@ -155,3 +160,4 @@ pub const FIXED: [u8; 18] = [
     0x67, 0x23, 0xFE, 0x30, 0x45, 0x33, 0xF8, 0x90, 0x99, 0x21, 0x07, 0xC1, 0xD0, 0x12, 0xB2, 0xA1,
     0x07, 0x81,
 ];
+
