@@ -7,7 +7,7 @@ use binrw::{binrw, BinRead, BinWrite};
 
 use crate::util::ByteCounter;
 
-fn record_size(record: &Record) -> u32 {
+fn get_record_size(record: &Record) -> u32 {
     let mut counter = ByteCounter::new();
 
     record
@@ -16,13 +16,14 @@ fn record_size(record: &Record) -> u32 {
     counter.bytes()
 }
 
+//TODO: this is very inefficient, consider other methods
 fn update_len(record: &mut Record) {
     match record {
         Record::mhbd(master) => {
             for child in &mut master.children {
                 update_len(child);
             }
-            master.len = record_size(&Record::mhbd(master.clone()));
+            master.len = get_record_size(&Record::mhbd(master.clone()));
         }
         Record::mhsd(list_container) => {
             let list = match &mut list_container.list {
@@ -36,14 +37,22 @@ fn update_len(record: &mut Record) {
             for child in &mut list.children {
                 update_len(child);
             }
-            list_container.len = record_size(&Record::mhsd(list_container.clone()));
+            list_container.len = get_record_size(&Record::mhsd(list_container.clone()));
         }
         Record::mhit(track) => {
             for child in &mut track.children {
                 update_len(child);
             }
-            track.len = record_size(&Record::mhit(track.clone()));
+            track.len = get_record_size(&Record::mhit(track.clone()));
         }
+        Record::mhia(album) => {
+            for child in &mut album.children {
+                update_len(child);
+            }
+            album.len = get_record_size(&Record::mhia(album.clone()));
+        }
+
+        // TODO: unimplemented records are just vecs of bytes, copied back on write
         _ => {}
     }
 }
@@ -83,7 +92,7 @@ pub(crate) enum Record {
     mhit(Track),
 
     #[brw(magic = b"mhia")]
-    mhia(Unimplemented),
+    mhia(Album),
 
     /// Odd item record, playlist with playlist items
     #[brw(magic = b"mhyp")]
@@ -317,6 +326,27 @@ pub(crate) struct Track {
     unk_0x22C: u32, // rogue 0x0000_0001, big endian flag?? seems to be set to 1 on podcasts
 
     #[brw(pad_before = 64)]
+    #[br(count = child_count)]
+    children: Vec<Record>,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, Clone)]
+pub(crate) struct Album {
+    #[bw(calc = 88)]
+    header_len: u32,
+    len: u32,
+
+    #[bw(calc = children.len() as u32)]
+    child_count: u32,
+
+    unk_0x10: u32, // looks like the track ids and such that start with 5
+    unk_0x14: u64, // looks like an id
+    unk_0x1C: u32, // always 2?
+    unk_0x20: u64, // looks like another id
+
+    #[brw(pad_before = 48)]
     #[br(count = child_count)]
     children: Vec<Record>,
 }
