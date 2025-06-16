@@ -1,4 +1,19 @@
+#![allow(unused)]
+
 use std::io::{Result, Seek, SeekFrom, Write};
+
+pub(crate) fn print_byte_diffs(a: &[u8], b: &[u8]) {
+    let min_len = a.len().min(b.len());
+
+    for i in 0..min_len {
+        if a[i] != b[i] {
+            println!("Byte 0x{:04X}: {:02X} != {:02X}", i, a[i], b[i]);
+        }
+    }
+    if a.len() != b.len() {
+        println!("Length differs: a.len()={} vs b.len()={}", a.len(), b.len());
+    }
+}
 
 pub(crate) struct ByteCounter {
     count: usize,
