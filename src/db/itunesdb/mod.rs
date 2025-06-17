@@ -1,80 +1,10 @@
-#![allow(non_camel_case_types, non_snake_case)]
-#![allow(unused)]
+#![allow(unused, non_camel_case_types, non_snake_case)]
 
 use std::io::Cursor;
 
-use binrw::{binrw, BinRead, BinWrite};
+use binrw::binrw;
 
-use crate::util::ByteCounter;
-
-fn get_record_size(record: &Record) -> u32 {
-    let mut counter = ByteCounter::new();
-
-    record
-        .write(&mut counter)
-        .expect("writing to temporary buffer failed");
-    counter.bytes()
-}
-
-//TODO: this is very inefficient, consider other methods
-fn update_len(record: &mut Record) {
-    match record {
-        Record::mhbd(master) => {
-            for child in &mut master.children {
-                update_len(child);
-            }
-            master.len = get_record_size(&Record::mhbd(master.clone()));
-        }
-        Record::mhsd(list_container) => {
-            let list = match &mut list_container.list {
-                List::Tracks(list)
-                | List::Playlists(list)
-                | List::Podcasts(list)
-                | List::Albums(list)
-                | List::InclSmartPlaylists(list) => list,
-            };
-
-            for child in &mut list.children {
-                update_len(child);
-            }
-            list_container.len = get_record_size(&Record::mhsd(list_container.clone()));
-        }
-        Record::mhit(track) => {
-            for child in &mut track.children {
-                update_len(child);
-            }
-            track.len = get_record_size(&Record::mhit(track.clone()));
-        }
-        Record::mhia(album) => {
-            for child in &mut album.children {
-                update_len(child);
-            }
-            album.len = get_record_size(&Record::mhia(album.clone()));
-        }
-
-        // TODO: unimplemented records are just vecs of bytes, copied back on write
-        _ => {}
-    }
-}
-
-pub(crate) fn write_to_buffer(record: &Record) -> Vec<u8> {
-    let mut record = record.clone();
-    let mut buf = Cursor::new(Vec::new());
-
-    update_len(&mut record);
-
-    record
-        .write(&mut buf)
-        .expect("binrw failed to write to buffer");
-
-    buf.into_inner()
-}
-
-pub(crate) fn read_from_buffer(buf: &[u8]) -> Record {
-    let mut cursor = Cursor::new(buf);
-
-    Record::read(&mut cursor).expect("binrw failed to read from buffer")
-}
+pub(crate) mod io;
 
 #[binrw]
 #[brw(little)]
@@ -96,25 +26,14 @@ pub(crate) enum Record {
 
     /// Odd item record, playlist with playlist items
     #[brw(magic = b"mhyp")]
-    mhyp(Unimplemented),
+    mhyp(Playlist),
 
     #[brw(magic = b"mhip")]
-    mhip(Unimplemented),
+    mhip(PlaylistEntry),
 
     /// Leaf record, variable len
     #[brw(magic = b"mhod")]
-    mhod(Unimplemented),
-}
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, Clone)]
-pub(crate) struct Unimplemented {
-    header_len: u32,
-    len: u32,
-
-    #[br(count = len - 12)]
-    data: Vec<u8>,
+    mhod(DataContainer),
 }
 
 #[binrw]
@@ -336,6 +255,7 @@ pub(crate) struct Track {
 pub(crate) struct Album {
     #[bw(calc = 88)]
     header_len: u32,
+
     len: u32,
 
     #[bw(calc = children.len() as u32)]
@@ -351,101 +271,244 @@ pub(crate) struct Album {
     children: Vec<Record>,
 }
 
-#[cfg(test)]
-mod tests {
-    use std::io::Cursor;
+#[binrw]
+#[brw(little)]
+#[derive(Debug, Clone)]
+pub(crate) struct Playlist {
+    #[bw(calc = 184)]
+    header_len: u32,
 
-    use binrw::BinRead;
+    len: u32,
 
-    use crate::db::hash58;
+    #[bw(calc = children.len() as u32)]
+    child_count: u32,
 
-    use super::{List, Record};
+    #[bw(calc = entries.len() as u32)]
+    entry_count: u32,
 
-    #[test]
-    fn test_hash58() {
-        const FWID: &str = "000A270013E10993";
-        const HASH_OFFSET: usize = 0x58;
-        const HASH_LEN: usize = 20;
+    is_master_flag: u8, // if true, this is the master playlist, containing all the tracks
+    flag_0x15: u8,
+    flag_0x16: u8,
+    flag_0x17: u8,
+    hfs_timestamp_0x18: u32,
+    persistent_id: u64,
+    unk_0x24: u32, // always 0?
+    string_obj_count: u16,
+    is_podcast_playlist_flag: u16,
+    sort_order: u32,
+    padding_0x30: [u8; 40],
+    hfs_timestamp_0x58: u32,
 
-        let mut buf = include_bytes!("./sample/iTunesDB").to_vec();
+    #[brw(pad_before = 92)]
+    #[br(count = child_count)]
+    children: Vec<Record>,
 
-        let stored_hash: [u8; HASH_LEN] =
-            buf[HASH_OFFSET..HASH_OFFSET + HASH_LEN].try_into().unwrap();
+    #[br(count = entry_count)]
+    entries: Vec<Record>,
+}
 
-        buf[HASH_OFFSET..HASH_OFFSET + HASH_LEN].fill(0);
-        buf[0x18..0x20].fill(0);
+#[binrw]
+#[brw(little)]
+#[derive(Debug, Clone)]
+pub(crate) struct PlaylistEntry {
+    #[bw(calc = 76)]
+    header_len: u32,
 
-        let new_hash = hash58::generate_hash58(FWID, &buf).expect("failed to hash database");
+    len: u32,
 
-        assert_eq!(stored_hash, new_hash);
-    }
+    #[bw(calc = children.len() as u32)]
+    child_count: u32,
 
-    #[test]
-    fn read_write_hash() {
-        const FWID: &str = "000A270013E10993";
-        const HASH_OFFSET: usize = 0x58;
-        const HASH_LEN: usize = 20;
+    podcast_group_flag: u16,
+    unk_0x18: u16,
+    group_id: u32, // doesn't seem to actually be useful
+    track_id: u32, // corresponds to an actual track in the track list
+    hfs_timestamp_0x28: u32,
+    padding_0x32: [u8; 12],
+    podcast_group_id: u32, // parent group that the podcast should be under, 0 for all other cases
+    unk_0x48: u32,
+    padding_0x52: [u8; 8],
+    unk_0x60: u64,
 
-        let on_disk = include_bytes!("./sample/iTunesDB");
-        let on_disk_copy = on_disk.to_vec().clone();
+    #[brw(pad_before = 8)]
+    #[br(count = child_count)]
+    children: Vec<Record>,
+}
 
-        let stored_hash: [u8; HASH_LEN] = on_disk[HASH_OFFSET..HASH_OFFSET + HASH_LEN]
-            .try_into()
-            .unwrap();
+#[binrw]
+#[brw(little)]
+#[br(import { data_type: u32, bytes_left: u32 })]
+#[derive(Debug, Clone)]
+pub enum Data {
+    #[br(pre_assert(data_type ==  1))]
+    Title(Utf16String),
 
-        let master = super::read_from_buffer(on_disk);
-        let mut written = super::write_to_buffer(&master).to_vec();
-        let written_copy = written.clone();
+    #[br(pre_assert(data_type ==  2))]
+    Location(Utf16String),
 
-        written[HASH_OFFSET..HASH_OFFSET + HASH_LEN].fill(0);
-        written[0x18..0x20].fill(0);
+    #[br(pre_assert(data_type ==  3))]
+    Album(Utf16String),
 
-        let new_hash = hash58::generate_hash58(FWID, &written).expect("failed to hash database");
+    #[br(pre_assert(data_type ==  4))]
+    Artist(Utf16String),
 
-        crate::util::print_byte_diffs(&on_disk_copy, &written_copy);
+    #[br(pre_assert(data_type ==  5))]
+    Genre(Utf16String),
 
-        assert_eq!(stored_hash, new_hash);
-    }
+    #[br(pre_assert(data_type ==  6))]
+    Filetype(Utf16String),
 
-    #[test]
-    fn parse_itdb() {
-        let bytes = include_bytes!("./sample/iTunesDB");
-        let mut cursor = Cursor::new(&bytes[..]);
-        let mut root: Record = Record::read(&mut cursor).expect("failed");
+    #[br(pre_assert(data_type ==  7))]
+    EqSetting(Utf16String),
 
-        match &root {
-            Record::mhbd(mhbd) => {
-                println!("found master record");
+    #[br(pre_assert(data_type ==  8))]
+    Comment(Utf16String),
 
-                for mhsd in &mhbd.children {
-                    match mhsd {
-                        Record::mhsd(mhsd) => {
-                            println!("found list container");
+    #[br(pre_assert(data_type ==  9))]
+    Category(Utf16String),
 
-                            match &mhsd.list {
-                                List::Tracks(mhlt) => {
-                                    println!("found track list");
-                                }
-                                List::Playlists(mhlp) => {
-                                    println!("found playlist list");
-                                }
-                                List::Podcasts(mhlp) => {
-                                    println!("found podcast playlists");
-                                }
-                                List::Albums(mhla) => {
-                                    println!("found album list");
-                                }
-                                List::InclSmartPlaylists(mhlp) => {
-                                    println!("found playlist list incl smart playlists");
-                                }
-                                _ => {}
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
+    #[br(pre_assert(data_type == 12))]
+    Composer(Utf16String),
+
+    #[br(pre_assert(data_type == 13))]
+    Grouping(Utf16String),
+
+    #[br(pre_assert(data_type == 14))]
+    Description(Utf16String),
+
+    #[br(pre_assert(data_type == 15))]
+    PodcastEnclosureUrl(#[br(args { bytes_left })] Utf8PodcastUrl),
+
+    #[br(pre_assert(data_type == 16))]
+    PodcastRssUrl(#[br(args { bytes_left })] Utf8PodcastUrl),
+
+    #[br(pre_assert(data_type == 17))]
+    ChapterData(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 18))]
+    Subtitle(Utf16String),
+
+    #[br(pre_assert(data_type == 19))]
+    Show(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 20))]
+    EpisodeNumber(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 21))]
+    TvNetwork(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 22))]
+    AlbumArtist(Utf16String),
+
+    #[br(pre_assert(data_type == 23))]
+    ArtistSort(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 24))]
+    Keywords(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 25))]
+    TvShowLocale(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 27))]
+    TitleSort(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 28))]
+    AlbumSort(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 29))]
+    AlbumArtistSort(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 30))]
+    ComposerSort(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 31))]
+    TvShowSort(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 32))]
+    UnknownVideoBinary(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 39))]
+    Copyright(Utf16String),
+
+    #[br(pre_assert(data_type == 50))]
+    SmartPlaylistData(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 51))]
+    SmartPlaylistRules(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 52))]
+    LibraryPlaylistIndex(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 53))]
+    JumpTable(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 100))]
+    ColumnSizingAndOrder(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 102))]
+    UnknownObject(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 200))]
+    AlbumInAlbumList(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 201))]
+    ArtistInAlbumList(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 202))]
+    ArtistSortInAlbumList(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 203))]
+    PodcastUrlInAlbumList(#[br(args { bytes_left })] Blob),
+
+    #[br(pre_assert(data_type == 204))]
+    TvShowInAlbumList(#[br(args { bytes_left })] Blob),
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, Clone)]
+pub(crate) struct DataContainer {
+    #[bw(calc = 24)]
+    header_len: u32,
+
+    len: u32,
+    data_type: u32,
+
+    #[brw(pad_before = 8)]
+    #[br(args { data_type: data_type, bytes_left: len - header_len })]
+    data: Data,
+}
+
+#[binrw]
+#[brw(little)]
+#[br(import { bytes_left: u32 })]
+#[derive(Debug, Clone)]
+pub(crate) struct Blob {
+    #[br(count = bytes_left)]
+    bytes: Vec<u8>,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, Clone)]
+pub(crate) struct Utf16String {
+    position: u32,
+
+    #[bw(calc = string.len() as u32 * 2)]
+    len: u32,
+
+    unk_0x08: u32,
+    unk_0x0C: u32,
+
+    #[br(count = len / 2)]
+    string: Vec<u16>,
+}
+
+#[binrw]
+#[brw(little)]
+#[br(import { bytes_left: u32 })]
+#[derive(Debug, Clone)]
+pub(crate) struct Utf8PodcastUrl {
+    #[br(count = bytes_left)]
+    url: Vec<u8>,
 }
