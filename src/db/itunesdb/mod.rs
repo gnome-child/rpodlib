@@ -1,7 +1,5 @@
 #![allow(unused, non_camel_case_types, non_snake_case)]
 
-use std::io::Cursor;
-
 use binrw::binrw;
 
 pub(crate) mod io;
