@@ -1,0 +1,17 @@
+[package]
+name = "rpod-device"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+plist = "1.8.0"
+regex = "1.12.1"
+thiserror.workspace = true
+rpod-itdb = { path = "../rpod-itdb" }
+rpod-display = { path = "../rpod-display" }
+binrw = "0.15.0"
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+version = "0.61.3"
+features = ["Win32_Devices_DeviceAndDriverInstallation", "Win32_System_Ioctl", "Win32_Storage_FileSystem", "Win32_Security", "Win32_System_IO"]

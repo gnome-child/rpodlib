@@ -1,0 +1,10 @@
+[package]
+name = "rpod-meta"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lofty = "0.22.4"
+symphonia.workspace = true
+thiserror.workspace = true

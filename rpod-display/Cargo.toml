@@ -1,0 +1,9 @@
+[package]
+name = "rpod-display"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+pretty-hex = "0.4.1"
+rpod-itdb = { path = "../rpod-itdb" }

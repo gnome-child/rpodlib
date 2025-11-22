@@ -1,0 +1,16 @@
+[package]
+name = "rpod-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lofty = "0.22.4"
+symphonia.workspace = true
+thiserror.workspace = true
+rpod-meta = { path = "../rpod-meta" }
+rpod-device = { path = "../rpod-device" }
+rpod-transcode = { path = "../rpod-transcode" }
+rpod-itdb = { path = "../rpod-itdb" }
+rpod-display = { path = "../rpod-display" }
+binrw = "0.15.0"

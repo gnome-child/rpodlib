@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = ["rpod-core", "rpod-itdb", "rpod-meta", "rpod-device", "rpod-transcode", "rpod-cli", "rpod-display"]
+
+[workspace.package]
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+thiserror = "2.0.17"
+symphonia = { git = "https://github.com/pdeljanov/Symphonia.git", rev = "505458eb1e479d84df0a65f95ab3d536d6350d29", features = [
+  "mp3",
+  "alac",
+  "isomp4",
+] }

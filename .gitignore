@@ -1,0 +1,5 @@
+/target
+/rpod-core/tests/fixtures/audio_files/**
+/rpod-core/tests/out
+/dump.txt
+/notes.txt
