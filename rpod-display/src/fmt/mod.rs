@@ -1,7 +1,9 @@
 use std::fmt::{Arguments, Debug, Display, Formatter, Result, Write};
 
+pub mod album_item;
 pub mod data_object;
 pub mod list;
+pub mod playlist_item;
 pub mod root;
 pub mod track_item;
 

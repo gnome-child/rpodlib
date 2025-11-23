@@ -760,6 +760,10 @@ impl Itdb {
         Ok(())
     }
 
+    pub fn as_raw(&self) -> &Root {
+        &self.root
+    }
+
     /// 1. Reorder tracks according to master playlist order
     fn reorder_tracks(&mut self) -> Result<()> {
         let mut tracks = IndexMap::with_capacity(self.tracks.len());

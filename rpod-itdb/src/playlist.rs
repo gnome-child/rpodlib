@@ -229,55 +229,6 @@ impl PlaylistItem {
         self.build_jump_list(track_items, LibraryIndexType::Composer);
     }
 
-    // FIXME
-    fn rebuild_podcast_entries(&mut self, track_items: &[TrackItem], base_group_id: u32) {
-        let by_id: HashMap<u32, &TrackItem> =
-            track_items.iter().map(|item| (item.id, item)).collect();
-
-        let mut next_group_id = base_group_id;
-        let mut next_pos = 100_000;
-        let mut album_table = HashMap::new();
-        let mut new_entries = Vec::new();
-
-        for mut entry in self.entries.drain(..) {
-            entry.data_objects.clear();
-
-            if let Some(item) = by_id.get(&entry.track_id) {
-                let album = item
-                    .get_string(DataType::Album)
-                    .unwrap_or_default()
-                    .into_owned();
-
-                let group_id = *album_table.entry(album.clone()).or_insert({
-                    let group_id = next_group_id;
-                    next_group_id = next_group_id.wrapping_add(1);
-
-                    let mut header = PlaylistEntry {
-                        podcast_group_flag: 1,
-                        podcast_group_id: group_id,
-                        ..PlaylistEntry::default()
-                    };
-                    _ = header.upsert_string(DataType::Title, album.clone());
-
-                    if let Some(location) = album.strip_prefix("The ") {
-                        _ = header.upsert_string(DataType::Location, location);
-                    }
-                    new_entries.push(header);
-                    group_id
-                });
-
-                entry.podcast_group_ref = group_id;
-                entry.upsert_data_object(DataType::Type100, DataObject::new_playlist_pos(next_pos));
-
-                next_pos = next_pos.wrapping_add(1);
-                new_entries.push(entry);
-            } else {
-                continue;
-            }
-        }
-        self.entries = new_entries
-    }
-
     fn build_jump_list(&mut self, track_items: &[TrackItem], index_type: LibraryIndexType) {
         let seeds = JumpListSeed::build_seeds(track_items, index_type);
 
@@ -347,7 +298,7 @@ pub struct PlaylistEntry {
     pub track_uid: u64,
     pub unk_0x34: u32,
     pub unk_0x38: u32,
-    pub persistent_id: u64,
+    pub uid: u64,
 
     #[br(count = header_len - Self::MIN_SIZE)]
     padding: Vec<u8>,
@@ -371,7 +322,7 @@ impl Default for PlaylistEntry {
             track_uid: 0,
             unk_0x34: 0,
             unk_0x38: 0,
-            persistent_id: 0,
+            uid: 0,
             padding: vec![0u8; (Self::MAX_SIZE - Self::MIN_SIZE) as usize],
             data_objects: Vec::new(),
         }

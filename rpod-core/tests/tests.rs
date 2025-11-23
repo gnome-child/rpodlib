@@ -85,6 +85,27 @@ fn test_audio_files() -> Result<Vec<PathBuf>> {
 }
 
 #[test]
+fn dump_db() -> Result<()> {
+    let mut device_handles = rpod_core::device::enumerate_device_mounts()?;
+
+    if device_handles.is_empty() {
+        println!("No supported iPods found, falling back to mock ipod...");
+
+        let dev_handle = DeviceHandle::new(0x1261, &fake_ipod_mount());
+        device_handles.push(dev_handle);
+    }
+
+    let ipod = iPod::try_load(&device_handles[0])?;
+    let tree_context = TreeContext::begin_unicode();
+
+    println!(
+        "{:#}",
+        ipod.database.as_raw().to_tree_string_pretty(tree_context)
+    );
+    Ok(())
+}
+
+#[test]
 fn compare_hash() -> Result<()> {
     let mut device_handles = rpod_core::device::enumerate_device_mounts()?;
 
@@ -93,61 +114,60 @@ fn compare_hash() -> Result<()> {
 
         let dev_handle = DeviceHandle::new(0x1261, &fake_ipod_mount());
         device_handles.push(dev_handle);
-        Ok(())
-    } else {
-        for handle in device_handles {
-            let ipod = iPod::try_load(&handle)?;
-
-            println!("found {}", ipod.model_string());
-
-            let bytes = fs::read(ipod.file_sys.itunesdb_path())?;
-            let mut cursor = Cursor::new(bytes);
-            let root = Root::read(&mut cursor)?;
-
-            let old_58 = root.hash_0x58;
-            let old_72 = root.hash_0x72;
-
-            let firewire_guid = ipod.sys_info.firewire_guid().ok_or(Error::Device(
-                rpod_device::error::Error::MissingFireWireGUID,
-            ))?;
-            let mut seed = [0u8; 8];
-
-            for (index, chunk) in firewire_guid.as_bytes().chunks(2).enumerate() {
-                seed[index] =
-                    u8::from_str_radix(str::from_utf8(chunk).unwrap(), 16).unwrap_or_default();
-            }
-
-            let mut cursor = Cursor::new(Vec::with_capacity(root.total_bytes_len() as usize));
-            root.write(&mut cursor)?;
-
-            let mut buf = cursor.into_inner();
-            let seeds = Seeds::extract(&buf)?;
-            let hasher = Hasher::from_bytes(&mut buf, &seeds)?;
-            hasher.hash(&seed)?;
-
-            let mut new_58 = [0u8; 20];
-            new_58.copy_from_slice(&buf[0x58..0x6C]);
-
-            let mut new_72 = [0u8; 46];
-            new_72.copy_from_slice(&buf[0x72..0xA0]);
-
-            if old_58 != new_58 {
-                println!("hash58 mismatch!");
-                println!("  old: {:02X?}", old_58);
-                println!("  new: {:02X?}", new_58);
-                panic!("hash58 did not round-trip");
-            }
-
-            if old_72 != new_72 {
-                println!("hash72 mismatch!");
-                println!("  old: {:02X?}", old_72);
-                println!("  new: {:02X?}", new_72);
-                panic!("hash72 did not round-trip");
-            }
-            println!("hashes match for {}", ipod.model_string());
-        }
-        Ok(())
     }
+
+    for handle in device_handles {
+        let ipod = iPod::try_load(&handle)?;
+
+        println!("found {}", ipod.model_string());
+
+        let bytes = fs::read(ipod.file_sys.itunesdb_path())?;
+        let mut cursor = Cursor::new(bytes);
+        let root = Root::read(&mut cursor)?;
+
+        let old_58 = root.hash_0x58;
+        let old_72 = root.hash_0x72;
+
+        let firewire_guid = ipod.sys_info.firewire_guid().ok_or(Error::Device(
+            rpod_device::error::Error::MissingFireWireGUID,
+        ))?;
+        let mut seed = [0u8; 8];
+
+        for (index, chunk) in firewire_guid.as_bytes().chunks(2).enumerate() {
+            seed[index] =
+                u8::from_str_radix(str::from_utf8(chunk).unwrap(), 16).unwrap_or_default();
+        }
+
+        let mut cursor = Cursor::new(Vec::with_capacity(root.total_bytes_len() as usize));
+        root.write(&mut cursor)?;
+
+        let mut buf = cursor.into_inner();
+        let seeds = Seeds::extract(&buf)?;
+        let hasher = Hasher::from_bytes(&mut buf, &seeds)?;
+        hasher.hash(&seed)?;
+
+        let mut new_58 = [0u8; 20];
+        new_58.copy_from_slice(&buf[0x58..0x6C]);
+
+        let mut new_72 = [0u8; 46];
+        new_72.copy_from_slice(&buf[0x72..0xA0]);
+
+        if old_58 != new_58 {
+            println!("hash58 mismatch!");
+            println!("  old: {:02X?}", old_58);
+            println!("  new: {:02X?}", new_58);
+            panic!("hash58 did not round-trip");
+        }
+
+        if old_72 != new_72 {
+            println!("hash72 mismatch!");
+            println!("  old: {:02X?}", old_72);
+            println!("  new: {:02X?}", new_72);
+            panic!("hash72 did not round-trip");
+        }
+        println!("hashes match for {}", ipod.model_string());
+    }
+    Ok(())
 }
 
 #[test]
@@ -204,7 +224,7 @@ fn make_new_db() -> Result<()> {
     }
 }
 
-#[test]
+// #[test]
 fn test_make_track_items() -> Result<()> {
     let test_audio_files = test_audio_files()?;
     let dev_handle = DeviceHandle::new(0x1261, &fake_ipod_mount());

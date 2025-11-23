@@ -72,6 +72,14 @@ impl TreeDisplay for AlbumItemList {
         ctx.writeln_empty(f, "")?;
         ctx.writeln_title(f, title)?;
         ctx.writeln_body(f, footer)?;
+
+        if f.alternate() {
+            for (index, child) in self.items.iter().enumerate() {
+                let next = ctx.descend(index + 1 == self.items.len());
+
+                child.tree_fmt(f, &next)?;
+            }
+        }
         Ok(())
     }
 }
@@ -88,6 +96,14 @@ impl TreeDisplay for PlaylistItemList {
         ctx.writeln_empty(f, "")?;
         ctx.writeln_title(f, title)?;
         ctx.writeln_body(f, footer)?;
+
+        if f.alternate() {
+            for (index, child) in self.items.iter().enumerate() {
+                let next = ctx.descend(index + 1 == self.items.len());
+
+                child.tree_fmt(f, &next)?;
+            }
+        }
         Ok(())
     }
 }
