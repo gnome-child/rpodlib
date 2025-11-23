@@ -12,6 +12,7 @@ use rpod_display::fmt::{TreeContext, TreeDisplayExt};
 use rpod_itdb::{
     SizeRange, Track,
     hash::{Hasher, Seeds},
+    list::List,
     root::Root,
     track_item::TrackItem,
 };
@@ -95,17 +96,104 @@ fn dump_db() -> Result<()> {
         device_handles.push(dev_handle);
     }
 
-    let ipod = iPod::try_load(&device_handles[0])?;
+    let mut ipod = iPod::try_load(&device_handles[0])?;
+    println!("loaded: {}", ipod.model_string());
+
+    std::fs::copy(
+        ipod.file_sys.itunesdb_path(),
+        ipod.file_sys.itunesdb_path().with_extension("bak"),
+    )?;
+
+    // let raw_db = ipod.database.as_raw();
+
+    // for set in &raw_db.list_containers {
+    //     println!("{:#?}", set.list_type);
+
+    //     match &set.list {
+    //         List::TrackItems(list) => println!("  {} items", list.items.len()),
+    //         List::LibraryPlaylists(list) => println!("  {} items", list.items.len()),
+    //         List::AlbumItems(list) => println!("  {} items", list.items.len()),
+    //         List::PodcastFmtLibPlaylists(list) => println!("  {} items", list.items.len()),
+    //         List::SpecialPlaylists(list) => println!("  {} items", list.items.len()),
+    //     }
+    // }
+
     let tree_context = TreeContext::begin_unicode();
 
     println!(
         "{:#}",
         ipod.database.as_raw().to_tree_string_pretty(tree_context)
     );
+
+    let mut ipod_locked = ipod.lock()?;
+
+    // let capabilities = ipod_locked.audio_capabilities();
+    // let music_dir = ipod_locked.file_sys.music_folder();
+    // let audio_file = test_audio_files()?[0].clone();
+    // let manifest = Manifest::from_path(&audio_file, &ProbeOptions::default())?;
+    // let outcome = auto_transcode(&manifest, &capabilities, &music_dir)?;
+    // let track_item = match outcome {
+    //     Outcome::Transcoded {
+    //         out_path,
+    //         operations,
+    //         ..
+    //     } => {
+    //         println!("transcoded:");
+
+    //         for op in operations {
+    //             println!("  {}", op);
+    //         }
+
+    //         let out_manifest = Manifest::from_path(&out_path, &ProbeOptions::default())?;
+    //         TrackItem::from_manifest(&out_manifest)
+    //     }
+    //     Outcome::Skipped { reason } => {
+    //         println!("skipped: {}", reason);
+    //         TrackItem::from_manifest(&manifest)
+    //     }
+    // };
+    // ipod_locked.insert_track(Track::from(&track_item))?;
+    ipod_locked.commit()?;
+
+    let mut device_handles = rpod_core::device::enumerate_device_mounts()?;
+
+    if device_handles.is_empty() {
+        println!("No supported iPods found, falling back to mock ipod...");
+
+        let dev_handle = DeviceHandle::new(0x1261, &fake_ipod_mount());
+        device_handles.push(dev_handle);
+    }
+
+    let ipod = iPod::try_load(&device_handles[0])?;
+    // let raw_db = ipod.database.as_raw();
+
+    // for set in &raw_db.list_containers {
+    //     println!("{:#?}", set.list_type);
+
+    //     match &set.list {
+    //         List::TrackItems(list) => println!("  {} items", list.items.len()),
+    //         List::LibraryPlaylists(list) => println!("  {} items", list.items.len()),
+    //         List::AlbumItems(list) => println!("  {} items", list.items.len()),
+    //         List::PodcastFmtLibPlaylists(list) => println!("  {} items", list.items.len()),
+    //         List::SpecialPlaylists(list) => println!("  {} items", list.items.len()),
+    //     }
+    // }
+    let tree_context = TreeContext::begin_unicode();
+
+    println!(
+        "{:#}",
+        ipod.database.as_raw().to_tree_string_pretty(tree_context)
+    );
+
+    // fs::remove_file(ipod_locked.file_sys.itunesdb_path())?;
+    // fs::rename(
+    //     ipod_locked.file_sys.itunesdb_path().with_extension("bak"),
+    //     ipod_locked.file_sys.itunesdb_path(),
+    // )?;
     Ok(())
 }
 
-#[test]
+// #[test]
 fn compare_hash() -> Result<()> {
     let mut device_handles = rpod_core::device::enumerate_device_mounts()?;
 
@@ -170,7 +258,7 @@ fn compare_hash() -> Result<()> {
     Ok(())
 }
 
-#[test]
+// #[test]
 fn make_new_db() -> Result<()> {
     let device_handles = rpod_core::device::enumerate_device_mounts()?;
 

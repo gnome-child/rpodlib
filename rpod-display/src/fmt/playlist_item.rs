@@ -90,7 +90,7 @@ impl TreeDisplay for PlaylistEntry {
             )
             .push("unk 0x18:", self.unk_0x18)
             .push("unk 0x19:", self.unk_0x19)
-            .push("podcast group id:", self.podcast_group_id)
+            .push("podcast group id:", self.podcast_episode_id)
             .push("track id:", self.track_id)
             .push("timestamp:", self.timestamp)
             .push("podcast group ref:", self.podcast_group_ref)

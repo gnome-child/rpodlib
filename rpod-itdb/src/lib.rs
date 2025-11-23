@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fs,
     io::Cursor,
     ops::{Deref, DerefMut},
@@ -622,7 +622,7 @@ impl TryFrom<Root> for Itdb {
         let mut podcasts = IndexMap::with_capacity(podcast_headers.len());
         for header in podcast_headers {
             let entries = podcast_groups
-                .remove(&header.podcast_group_id)
+                .remove(&header.podcast_episode_id)
                 .unwrap_or_default()
                 .into_iter()
                 .filter(|entry| entry.podcast_group_flag == 0);
@@ -679,13 +679,13 @@ impl TryFrom<Root> for Itdb {
 
 impl Itdb {
     pub fn commit(&mut self) -> Result<()> {
+        self.sanitize()?;
         self.reorder_tracks()?;
         self.assign_ids()?;
         self.rebuild_album_list()?;
         self.rebuild_track_list()?;
         self.rebuild_playlists()?;
         self.rebuild_podcasts()?;
-        self.sanitize()?;
 
         Ok(())
     }
@@ -846,18 +846,26 @@ impl Itdb {
 
         for podcast in self.podcasts.values_mut() {
             let group_id = next_id;
-            let entry_count = podcast.entries.len() as u32;
-            next_id = next_id.wrapping_add(entry_count.max(1));
+            next_id = next_id.wrapping_add(1);
 
             let header = podcast.header_mut();
-            header.podcast_group_id = group_id;
+            header.podcast_episode_id = group_id;
 
-            for (index, entry) in podcast.entries.iter_mut().enumerate() {
-                let pos = group_id.wrapping_add(index as u32);
+            for entry in podcast.entries.iter_mut() {
+                if let Some(track) = self.tracks.get(&entry.track_uid) {
+                    entry.track_id = track.id;
+                }
 
+                let episode_id = next_id;
+                next_id = next_id.wrapping_add(1);
+
+                entry.podcast_episode_id = episode_id;
                 entry.podcast_group_ref = group_id;
                 entry.data_objects.clear();
-                entry.upsert_data_object(DataType::Type100, DataObject::new_playlist_pos(pos));
+                entry.upsert_data_object(
+                    DataType::Type100,
+                    DataObject::new_playlist_pos(episode_id),
+                );
             }
         }
         Ok(())
@@ -866,20 +874,17 @@ impl Itdb {
     /// 3. Rebuild the album item list
     fn rebuild_album_list(&mut self) -> Result<()> {
         let root = &mut self.root;
+        let mut by_id: BTreeMap<u32, &TrackItem> = BTreeMap::new();
 
-        let mut current_album = 0;
-
-        let mut first_tracks = Vec::new();
         for track in self.tracks.values() {
-            if track.album_id != current_album {
-                current_album = track.album_id;
-                first_tracks.push(Track::from(track.as_ref()));
-            }
+            by_id
+                .entry(track.album_id)
+                .or_insert_with(|| track.as_ref());
         }
 
-        let mut album_items = Vec::with_capacity(first_tracks.len());
-        for track in first_tracks {
-            album_items.push(AlbumItem::from_track_item(track.as_ref())?);
+        let mut album_items = Vec::with_capacity(by_id.len());
+        for track_item in by_id.values() {
+            album_items.push(AlbumItem::from_track_item(track_item)?);
         }
 
         root.album_item_list_mut()

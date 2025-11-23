@@ -286,15 +286,15 @@ pub struct PlaylistEntry {
     #[bw(calc = self.data_objects.len() as u32)]
     data_object_count: u32,
 
-    pub unk_0x16: u8,           // always 0??
-    pub podcast_group_flag: u8, // 0x01 in podcast headers
-    pub unk_0x18: u8,           // 0x00 or 0x01 in podcast headers
-    pub unk_0x19: u8,           // 0x81 or 0x80 in podcast headers
-    pub podcast_group_id: u32, // cannot overlap track ids, used in podcast group header as group id, referenced below
-    pub track_id: u32,         // from track item
-    pub timestamp: u32,        // time added?
-    pub podcast_group_ref: u32, // podcast grouping reference
-    pub podcast_uid: u64,      // one occurence in the db??
+    pub unk_0x16: u8,            // always 0??
+    pub podcast_group_flag: u8,  // 0x01 in podcast headers
+    pub unk_0x18: u8,            // 0x00 or 0x01 in podcast headers
+    pub unk_0x19: u8,            // 0x81 or 0x80 in podcast headers
+    pub podcast_episode_id: u32, // cannot overlap track ids, used in podcast group header as group id, referenced below
+    pub track_id: u32,           // from track item
+    pub timestamp: u32,          // time added?
+    pub podcast_group_ref: u32,  // podcast grouping reference
+    pub podcast_uid: u64,        // one occurence in the db??
     pub track_uid: u64,
     pub unk_0x34: u32,
     pub unk_0x38: u32,
@@ -314,7 +314,7 @@ impl Default for PlaylistEntry {
             podcast_group_flag: 0,
             unk_0x18: 0,
             unk_0x19: 0,
-            podcast_group_id: 0,
+            podcast_episode_id: 0,
             track_id: 0,
             timestamp: 0,
             podcast_group_ref: 0,

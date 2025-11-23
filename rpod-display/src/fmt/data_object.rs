@@ -35,6 +35,9 @@ impl TreeDisplay for DataObject {
                     format_args!("{}", String::from_utf8_lossy(&payload.chars)),
                 );
             }
+            Payload::PlaylistPosition(payload) => {
+                body.push("position num:", payload.position);
+            }
             _ => {} // ignore other payload kinds
         }
 
